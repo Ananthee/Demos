@@ -1,0 +1,449 @@
+Steps for implementing Spring Security in a project
+-----------------------------------------------------
+
+
+Step 1:
+--------
+Dependencies
+--------------
+<dependency>
+    <groupId>org.springframework.security</groupId>
+    <artifactId>spring-security-web</artifactId>
+    <version>4.1.3.RELEASE</version>
+</dependency>
+
+<dependency>
+    <groupId>org.springframework.security</groupId>
+    <artifactId>spring-security-config</artifactId>
+    <version>4.1.3.RELEASE</version>
+</dependency>
+
+
+Step 2:
+--------
+Configuring the filter in deployment descriptor
+------------------------------------------------
+
+filter in J2EE?
+
+Filter is a J2EE component which is used to intercept incoming requests for the following purposes:
+
+Compression
+Audit
+Re-routing request
+
+multiple filters can be used in a sequence to perform different tasks. these set of filters are known to be filter chain.
+
+
+<filter>
+    <filter-name>springSecurityFilterChain</filter-name>
+    <filter-class>org.springframework.web.filter.DelegatingFilterProxy</filter-class>
+</filter>
+ 
+<filter-mapping>
+    <filter-name>springSecurityFilterChain</filter-name>
+    <url-pattern>/*</url-pattern>
+</filter-mapping>
+
+
+
+
+/*-->all incoming requests
+
+/admin/*-->all incoming requests starting with /admin/
+
+		/admin/home
+		/admin/productmgmt
+		/admin/users
+		/adminhome x
+
+
+/admin*--> any url  that starts with "/admin"
+	
+		/admins
+		/administrator
+		/admin/home
+		/admin/productmgmt
+
+
+Step 3:
+---------
+configuring Spring Security Beans
+----------------------------------
+
+<beans:beans xmlns="http://www.springframework.org/schema/security"
+    xsi:schemaLocation="
+    http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security.xsd">
+
+
+
+
+<http auto-config="true">
+	<intercept-url pattern="/" access="permitAll"/>
+        <intercept-url pattern="/admin**" access="hasRole('ADMIN')" />
+        <form-login  authentication-failure-url="/Access_Denied" />
+    </http>
+
+
+intercept-url-->defines the urls which is to be intercepted by spring security
+
+pattern-->it defines the url pattern to intercept
+
+access--> which all roles are going to have access to this url-pattern. it can have the following:
+
+permitAll
+hasRole('ADMIN')-->grants access to only one role
+hasAnyRole('ADMIN','USER') --> grants access to multiple roles at a time
+
+
+
+
+<intercept-url pattern="/" access="permitAll" />
+<intercept-url pattern="/home" access="permitAll" />
+
+
+the URLs "/" and "/home" will be accessible by all users including anonymous users
+
+
+<intercept-url pattern="/admin**" access="hasRole('ADMIN')" />
+.
+the URL  which starts with "/admin" will be accessible only by users having role of ADMIN
+
+
+
+<form-login authentication-failure-url="/Access_Denied" />
+
+
+1. default login form with static Authentication provider
+2. custom login form with static Authentication provider
+3. default login form with jdbc Authentication provider
+4. custom login form with jdbc Authentication provider
+5. default login form with custom Authentication provider
+6. custom login form with custom Authentication provider
+
+
+
+
+default login form--> Spring security by default provides a view page as login form.
+
+
+you cannot custmize a default login form i.e. you cannot change the look and feel, or add any other components.
+
+
+
+custom login form--> this is a view page(jsp/html) which can be created by us but we will have to maintain some naming conventions so that it recognizes the view as the login form
+
+
+static authentication provider--> hardcoded values in the spring security config for username, password and role
+
+
+jdbc authentication provider-->getting the values of username, password,role from a datasource using jdbc
+
+
+custom authentication provider-->getting the values of username, password,role from a user defined class.
+
+
+
+
+
+ <authentication-manager >
+        <authentication-provider>
+            <user-service>
+                <user name="somsubhra"  password="password@123"  authorities="ROLE_USER" />
+                <user name="admin" password="password@123" authorities="ROLE_ADMIN" />
+                
+            </user-service>
+        </authentication-provider>
+    </authentication-manager>
+
+
+
+authentication-provider-->responsible for defining the source of authentication data from multiple data sources i.e. statc values, database, xml, LDAP,custom 
+
+<user name="somsubhra" password="password@123"  authorities="ROLE_USER" />
+
+
+user-->this tag is used for defining a particular user who will be identtified with username, password and role
+
+
+name-->this attribute of user tag is used for providing the username
+password-->this attribute of user tag is used for providing the password
+authorities-->this attribute of user tag is used for providing the role
+
+
+
+
+Naming Conventions of Roles in Spring Security
+-----------------------------------------------
+1. Must start with ROLE_
+
+
+2. Must be in capital letters
+
+
+
+ROLE_ADMIN
+ROLE_USER
+ROLE_User x
+USER x
+
+
+
+Java Based Config for Spring Security
+----------------------------------------
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig extends WebSecurityConfigurerAdapter{
+	
+	@Autowired
+	public void configureGlobalSecurity(AuthenticationManagerBuilder auth) throws Exception {
+		auth.inMemoryAuthentication().withUser("somsubhra").password("password@123").roles("ADMIN");
+		
+	}
+	
+	@Override
+	protected void configure(HttpSecurity http) throws Exception {
+		http.authorizeRequests()
+		.antMatchers("/","/home").permitAll()
+		.antMatchers("/admin/**").access("hasRole('ADMIN')")
+		.and().formLogin()
+		.and().exceptionHandling().accessDeniedPage("/Access_Denied");
+		
+	}
+
+}
+
+
+
+@EnableWebSecurity-->similar to <http auto-config="true"/>
+
+
+
+
+
+       
+        <intercept-url pattern="/admin**" access="hasRole('ADMIN')" />
+        <form-login  authentication-failure-url="/Access_Denied" />
+
+  
+
+http.authorizeRequests()
+		.antMatchers("/admin**").access("hasRole('ADMIN')")
+		.and().formLogin()
+		.and().exceptionHandling().accessDeniedPage("/Access_Denied");
+
+
+
+
+class must extend from WebSecurityConfigurerAdapter class
+
+you must override the configure(HttpSecurity http) method
+
+
+
+
+
+
+
+
+
+@Autowired
+	public void configureGlobalSecurity(AuthenticationManagerBuilder auth) throws Exception {
+		auth.inMemoryAuthentication().withUser("somsubhra").password("password@123").roles("USER")
+		.and().withUser("admin").password("password").roles("ADMIN");
+
+
+  <authentication-provider>
+            <user-service>
+                <user name="somsubhra"  password="password@123"  authorities="ROLE_USER" />
+                <user name="admin" password="password@123" authorities="ROLE_ADMIN" />
+                
+            </user-service>
+        </authentication-provider>
+
+
+
+
+
+
+step 1:
+dependencies
+
+Step 2:
+intercept-url-->antMatcher()
+
+authentication manager--AuthenticationManagerBuilder
+
+
+
+
+Adding the Spring Security Filter
+-----------------------------------
+public class SecurityWebAppInitializer extends AbstractSecurityWebApplicationInitializer {
+	
+	
+
+}
+
+is equivalent to:
+
+ <filter>
+    <filter-name>springSecurityFilterChain</filter-name>
+    <filter-class>org.springframework.web.filter.DelegatingFilterProxy</filter-class>
+</filter>
+ 
+<filter-mapping>
+    <filter-name>springSecurityFilterChain</filter-name>
+    <url-pattern>/*</url-pattern>
+</filter-mapping>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
